@@ -61,20 +61,20 @@ module.exports = function (app) {
       };
       app.debug('delta: ' +  JSON.stringify(delta));
       return delta
-
     }
 
     function sendUpdates () {
-      app.debug('Sending updates: ' + JSON.stringify(updates));
-      app.handleMessage(id, updates);
+      var updates_copy = JSON.parse(JSON.stringify(updates));
+      app.debug('Sending updates: ' + JSON.stringify(updates_copy));
+      app.handleMessage(id, updates_copy);
     }
 
     setInterval(sendUpdates, 1000);
 
     //handle incoming messages
     client.on('message',function(topic, message, packet) {
-    	app.debug("Message is " + message);
     	app.debug("Topic is " + topic);
+      app.debug("Message is " + message);
       if (!topic.match('/bridge/')) {
         topic = topic.replace(/zigbee2mqtt\//,'');
         var values = JSON.parse(message);
