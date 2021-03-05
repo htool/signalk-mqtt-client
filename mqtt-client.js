@@ -32,19 +32,19 @@ module.exports = function (app) {
       for (const [key, value] of Object.entries(values)) {
         var new_value = value;
         if (key == 'temperature') {
-          new_value = (value + 273.15).toFixed(2); // Celcius to Kelvin
+          new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
         }
         if (key == 'pressure') {
-          new_value = value * 100; // mBar to Pascal
+          new_value = parseFloat((value * 100).toFixed(2)); // mBar to Pascal
         }
         if (key == 'humidity') {
-          new_value = (value / 100).toFixed(2); // Percent to ratio
+          new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
         }
         if (key == 'voltage') {
-          new_value = (value / 1000).toFixed(3); // Percent to ratio
+          new_value = parseFloat((value / 1000).toFixed(3)); // Percent to ratio
         }
         if (key == 'battery') {
-          new_value = (value / 100).toFixed(2); // Percent to ratio
+          new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
         }
         deltas.push({path: path + key, value: new_value});
       }
