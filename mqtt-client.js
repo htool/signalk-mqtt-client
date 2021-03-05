@@ -6,21 +6,31 @@ var count = 0;
 
 module.exports = function (app) {
   var plugin = {};
-
+  var paths = {};
   plugin.id = 'signalk-mqtt-client';
   plugin.name = 'Simple MQTT client';
   plugin.description = 'Simple MQTT client to get updates from MQTT broker';
 
   plugin.start = function (options, restartPlugin) {
-    var client = mqtt.connect("mqtt://192.168.1.117",{clientId:"signalk-mqtt-client"});
+    app.debug('Options: ' + JSON.stringify(options));
+    for (const [key, value] of Object.entries(options.paths)) {
+      paths[value['topic']] = value['path'];
+    }
+    app.debug('paths: ' + JSON.stringify(paths));
+
+    const remoteHost = options.remoteHost;
+    var client = mqtt.connect(remoteHost,{clientId:"signalk-mqtt-client"});
     app.debug("Connected flag " + client.connected);
     // Here we put our plugin logic
 
-    function toDelta(path, values) {
+    function toDelta(topic, values) {
       context = 'vessels.' + app.selfId;
+      // app.debug('context: ' + context + ' values: ' + JSON.stringify(values));
+      var path = paths[topic] + '.' + topic.replace(/\//, '.').toLowerCase() + '.';
+
       var deltas = [];
       for (const [key, value] of Object.entries(values)) {
-        deltas.push({path: (path + '.' + key).toLowerCase(), value: value});
+        deltas.push({path: path + key, value: value});
       }
       const delta = {
         context: context,
@@ -41,10 +51,9 @@ module.exports = function (app) {
     	app.debug("Message is " + message);
     	app.debug("Topic is " + topic);
       if (!topic.match('/bridge/')) {
-        var path = 'environment.' + topic.replace(/zigbee2mqtt\//,'').replace(/\//,'.');
+        topic = topic.replace(/zigbee2mqtt\//,'');
         var values = JSON.parse(message);
-        app.debug('path: ' + path + ' values: ' + JSON.stringify(values));
-        app.handleMessage(id, toDelta(path, values));
+        app.handleMessage(id, toDelta(topic, values));
       }
     });
 
@@ -52,9 +61,14 @@ module.exports = function (app) {
       app.debug("Connected " + client.connected);
     })
 
-    var topic_list=["zigbee2mqtt/#", "zigbee2mqtt/Douche", "zigbee2mqtt/Woonkamer"];
+
+    //var topic_list=["zigbee2mqtt/#", "zigbee2mqtt/Douche", "zigbee2mqtt/Woonkamer"];
+    var topic_list=[];
+    Object.keys(paths).forEach(function(topic) {
+        topic_list.push('zigbee2mqtt/' + topic);
+    });
     var topic_o={"Buiten":1};
-    app.debug("Subscribing to topics");
+    app.debug("Subscribing to topics: " + topic_list);
     // client.subscribe('Buiten',{qos:1}); //single topic
     client.subscribe(topic_list,{qos:1}); //topic list
     // client.subscribe(topic_o); //object
@@ -69,7 +83,44 @@ module.exports = function (app) {
 
   plugin.schema = {
     // The plugin schema
+    title: 'Signal K - MQTT simple client',
+    type: 'object',
+    required: ['remoteHost'],
+    properties: {
+      remoteHost: {
+        type: 'string',
+        title: 'MQTT server Url (starts with mqtt/mqtts)',
+        description:
+          'MQTT server connect to',
+        default: 'mqtt://somehost',
+      },
+      username: {
+        type: "string",
+        title: "MQTT server username"
+      },
+      password: {
+        type: "string",
+        title: "MQTT server password"
+      },
+      paths: {
+        type: 'array',
+        title: 'Topics to subscribe to',
+        items: {
+          type: 'object',
+          properties: {
+            topic: {
+              type: 'string',
+              title: 'Topic',
+            },
+            path: {
+              type: 'string',
+              title: 'Self path',
+              default: 'environment'
+            },
+          },
+        },
+      },
+    }
   };
-
   return plugin;
 };
