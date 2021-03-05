@@ -7,6 +7,8 @@ var client;
 module.exports = function (app) {
   var plugin = {};
   var paths = {};
+  var updates = [];
+
   plugin.id = 'signalk-mqtt-client';
   plugin.name = 'Simple MQTT client';
   plugin.description = 'Simple MQTT client to get updates from MQTT broker';
@@ -59,8 +61,15 @@ module.exports = function (app) {
       };
       app.debug('delta: ' +  JSON.stringify(delta));
       return delta
+
     }
 
+    function sendUpdates () {
+      app.debug('Sending updates: ' + JSON.stringify(updates));
+      app.handleMessage(id, updates);
+    }
+
+    setInterval(sendUpdates, 1000);
 
     //handle incoming messages
     client.on('message',function(topic, message, packet) {
@@ -69,7 +78,7 @@ module.exports = function (app) {
       if (!topic.match('/bridge/')) {
         topic = topic.replace(/zigbee2mqtt\//,'');
         var values = JSON.parse(message);
-        app.handleMessage(id, toDelta(topic, values));
+        updates = toDelta(topic, values);
       }
     });
 
