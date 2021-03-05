@@ -1,7 +1,7 @@
 var mqtt = require('mqtt');
 const id = 'signalk-mqtt-client';
 var count = 0;
-
+var client;
 
 
 module.exports = function (app) {
@@ -19,7 +19,7 @@ module.exports = function (app) {
     app.debug('paths: ' + JSON.stringify(paths));
 
     const remoteHost = options.remoteHost;
-    var client = mqtt.connect(remoteHost,{clientId:"signalk-mqtt-client"});
+    client = mqtt.connect(remoteHost,{clientId:"signalk-mqtt-client"});
     app.debug("Connected flag " + client.connected);
     // Here we put our plugin logic
 
@@ -77,6 +77,9 @@ module.exports = function (app) {
       app.debug("Connected " + client.connected);
     })
 
+    client.on("end",function() {
+      app.debug("Disconnected at own request.");
+    })
 
     //var topic_list=["zigbee2mqtt/#", "zigbee2mqtt/Douche", "zigbee2mqtt/Woonkamer"];
     var topic_list=[];
@@ -94,6 +97,7 @@ module.exports = function (app) {
 
   plugin.stop = function () {
     // Here we put logic we need when the plugin stops
+    client.end();
     app.debug('Plugin stopped');
   };
 
