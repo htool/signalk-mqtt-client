@@ -40,6 +40,9 @@ module.exports = function (app) {
         if (key == 'humidity') {
           new_value = (value / 100).toFixed(2); // Percent to ratio
         }
+        if (key == 'voltage') {
+          new_value = (value / 1000).toFixed(3); // Percent to ratio
+        }
         if (key == 'battery') {
           new_value = (value / 100).toFixed(2); // Percent to ratio
         }
