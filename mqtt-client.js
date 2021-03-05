@@ -30,7 +30,20 @@ module.exports = function (app) {
 
       var deltas = [];
       for (const [key, value] of Object.entries(values)) {
-        deltas.push({path: path + key, value: value});
+        var new_value = value;
+        if (key == 'temperature') {
+          new_value = (value + 273.15).toFixed(2); // Celcius to Kelvin
+        }
+        if (key == 'pressure') {
+          new_value = value * 100; // mBar to Pascal
+        }
+        if (key == 'humidity') {
+          new_value = (value / 100).toFixed(2); // Percent to ratio
+        }
+        if (key == 'battery') {
+          new_value = (value / 100).toFixed(2); // Percent to ratio
+        }
+        deltas.push({path: path + key, value: new_value});
       }
       const delta = {
         context: context,
