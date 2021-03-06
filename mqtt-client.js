@@ -2,12 +2,14 @@ var mqtt = require('mqtt');
 const id = 'signalk-mqtt-client';
 var count = 0;
 var client;
-
+var intervalTime = 10; // seconds between updates
+var TTL = 900; // default TTL in seconds
 
 module.exports = function (app) {
   var plugin = {};
   var paths = {};
   var updates = [];
+  var updateValues = {};
 
   plugin.id = 'signalk-mqtt-client';
   plugin.name = 'Simple MQTT client';
@@ -25,30 +27,37 @@ module.exports = function (app) {
     app.debug("Connected flag " + client.connected);
     // Here we put our plugin logic
 
-    function toDelta(topic, values) {
+    function toDelta() {
       context = 'vessels.' + app.selfId;
       // app.debug('context: ' + context + ' values: ' + JSON.stringify(values));
-      var path = paths[topic] + '.' + topic.replace(/\//, '.').toLowerCase() + '.';
-
       var deltas = [];
-      for (const [key, value] of Object.entries(values)) {
-        var new_value = value;
-        if (key == 'temperature') {
-          new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
+      var epoch = Math.floor(+new Date() / 1000);
+      for (const [topic, data] of Object.entries(updateValues)) {
+        var path = paths[topic] + '.' + topic.replace(/\//, '.').toLowerCase() + '.';
+        for (const [key, dataValues] of Object.entries(data)) {
+          var value = dataValues['value'];
+          var valueTTL = dataValues['ttl'];
+          var new_value = value;
+          //app.debug('key: ' + key + ' value: ' + value + ' ttl: ' + valueTTL);
+          if (valueTTL > epoch) {
+            if (key == 'temperature') {
+              new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
+            }
+            if (key == 'pressure') {
+              new_value = parseFloat((value * 100).toFixed(2)); // mBar to Pascal
+            }
+            if (key == 'humidity') {
+              new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
+            }
+            if (key == 'voltage') {
+              new_value = parseFloat((value / 1000).toFixed(3)); // Percent to ratio
+            }
+            if (key == 'battery') {
+              new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
+            }
+            deltas.push({path: path + key, value: new_value});
+          }
         }
-        if (key == 'pressure') {
-          new_value = parseFloat((value * 100).toFixed(2)); // mBar to Pascal
-        }
-        if (key == 'humidity') {
-          new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
-        }
-        if (key == 'voltage') {
-          new_value = parseFloat((value / 1000).toFixed(3)); // Percent to ratio
-        }
-        if (key == 'battery') {
-          new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
-        }
-        deltas.push({path: path + key, value: new_value});
       }
       const delta = {
         context: context,
@@ -59,7 +68,6 @@ module.exports = function (app) {
           },
         ],
       };
-      app.debug('delta: ' +  JSON.stringify(delta));
       return delta
     }
 
@@ -69,16 +77,35 @@ module.exports = function (app) {
       app.handleMessage(id, updates_copy);
     }
 
-    setInterval(sendUpdates, 1000);
+    function addValues (topic, values) {
+      if (!(topic in updateValues)) {
+        updateValues[topic] = {};
+      }
+      for (const [key, value] of Object.entries(values)) {
+        if (!(key in updateValues[topic])) {
+          updateValues[topic][key] = {};
+        }
+        updateValues[topic][key]['value'] = value;
+        updateValues[topic][key]['ttl'] = Math.floor(+new Date() / 1000) + TTL ;
+      }
+    }
+
+    setInterval(updateAndSend, intervalTime * 1000);
+
+    function updateAndSend () {
+      updates = toDelta();
+      sendUpdates();
+    }
 
     //handle incoming messages
     client.on('message',function(topic, message, packet) {
     	app.debug("Topic is " + topic);
       app.debug("Message is " + message);
       if (!topic.match('/bridge/')) {
-        topic = topic.replace(/zigbee2mqtt\//,'');
+        topic = topic.replace(/^[a-zA-Z0-9]+\//,'');
         var values = JSON.parse(message);
-        updates = toDelta(topic, values);
+        addValues(topic, values);
+        updateAndSend();
       }
     });
 
@@ -93,9 +120,10 @@ module.exports = function (app) {
     //var topic_list=["zigbee2mqtt/#", "zigbee2mqtt/Douche", "zigbee2mqtt/Woonkamer"];
     var topic_list=[];
     Object.keys(paths).forEach(function(topic) {
-        topic_list.push('zigbee2mqtt/' + topic);
+      topic_list.push('+/' + topic);
     });
-    var topic_o={"Buiten":1};
+    // topic_list=['#'];
+    // var topic_o={"#":1};
     app.debug("Subscribing to topics: " + topic_list);
     // client.subscribe('Buiten',{qos:1}); //single topic
     client.subscribe(topic_list,{qos:1}); //topic list
