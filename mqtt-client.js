@@ -44,31 +44,20 @@ module.exports = function (app) {
           if (valueTTL > epoch) {
             if (key == 'temperature') {
               new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
-              units = 'K';
-              description = 'Temperature';
             }
             if (key == 'pressure') {
               new_value = parseFloat((value * 100).toFixed(2)); // mBar to Pascal
-              units = 'Pa';
-              description = 'Pressure in zone';
             }
             if (key == 'humidity') {
               new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
-              units = 'ratio';
             }
             if (key == 'voltage') {
               new_value = parseFloat((value / 1000).toFixed(3)); // Percent to ratio
-              units = 'V';
-              description = 'Voltage';
             }
             if (key == 'battery') {
               new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
             }
-            if (units != '') {
-              deltas.push({path: path + key, meta: {description: description, units: units}, value: new_value});
-            } else {
-              deltas.push({path: path + key, value: new_value});
-            }
+            deltas.push({path: path + key, value: new_value});
           }
         }
       }
