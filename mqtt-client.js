@@ -38,24 +38,37 @@ module.exports = function (app) {
           var value = dataValues['value'];
           var valueTTL = dataValues['ttl'];
           var new_value = value;
+          var units = '';
+          var description = '';
           //app.debug('key: ' + key + ' value: ' + value + ' ttl: ' + valueTTL);
           if (valueTTL > epoch) {
             if (key == 'temperature') {
               new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
+              units = 'K';
+              description = 'Temperature';
             }
             if (key == 'pressure') {
               new_value = parseFloat((value * 100).toFixed(2)); // mBar to Pascal
+              units = 'Pa';
+              description = 'Pressure in zone';
             }
             if (key == 'humidity') {
               new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
+              units = 'ratio';
             }
             if (key == 'voltage') {
               new_value = parseFloat((value / 1000).toFixed(3)); // Percent to ratio
+              units = 'V';
+              description = 'Voltage';
             }
             if (key == 'battery') {
               new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
             }
-            deltas.push({path: path + key, value: new_value});
+            if (units != '') {
+              deltas.push({path: path + key, meta: {description: description, units: units}, value: new_value});
+            } else {
+              deltas.push({path: path + key, value: new_value});
+            }
           }
         }
       }
@@ -86,7 +99,7 @@ module.exports = function (app) {
           updateValues[topic][key] = {};
         }
         updateValues[topic][key]['value'] = value;
-        updateValues[topic][key]['ttl'] = Math.floor(+new Date() / 1000) + TTL ;
+        updateValues[topic][key]['ttl'] = Math.floor(new Date() / 1000) + TTL ;
       }
     }
 
