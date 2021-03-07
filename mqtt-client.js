@@ -3,7 +3,7 @@ const id = 'signalk-mqtt-client';
 var count = 0;
 var client;
 var intervalTime = 10; // seconds between updates
-var TTL = 1800; // default TTL in seconds
+var TTL = 3600; // default TTL in seconds
 
 module.exports = function (app) {
   var plugin = {};
