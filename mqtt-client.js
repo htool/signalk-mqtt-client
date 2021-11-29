@@ -10,6 +10,7 @@ module.exports = function (app) {
   var paths = {};
   var updates = [];
   var updateValues = {};
+  var metas_prev = [];
 
   plugin.id = 'signalk-mqtt-client';
   plugin.name = 'Simple MQTT client';
@@ -31,11 +32,18 @@ module.exports = function (app) {
       context = 'vessels.' + app.selfId;
       // app.debug('context: ' + context + ' values: ' + JSON.stringify(values));
       var deltas = [];
+      var metas = [];
       var epoch = Math.floor(+new Date() / 1000);
       for (const [topic, data] of Object.entries(updateValues)) {
         var path = paths[topic] + '.' + topic.replace(/\//, '.').toLowerCase() + '.';
         for (const [key, dataValues] of Object.entries(data)) {
           var value = dataValues['value'];
+          if (value == 'ON') {
+            value = 1
+          }
+          if (value == 'OFF') {
+            value = 0
+          }
           var valueTTL = dataValues['ttl'];
           var new_value = value;
           var units = '';
@@ -44,32 +52,58 @@ module.exports = function (app) {
           if (valueTTL > epoch) {
             if (key == 'temperature') {
               new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
+              units = 'K'
             }
             if (key == 'pressure') {
               new_value = parseFloat((value * 100).toFixed(2)); // mBar to Pascal
+              units = 'Pa'
             }
             if (key == 'humidity') {
               new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
+              units = 'ratio'
+            }
+            if (key == 'energy') {
+              units = 'Wh'
+            }
+            if (key == 'power') {
+              units = 'W'
+            }
+            if (key == 'current') {
+              units = 'A'
             }
             if (key == 'voltage') {
-              new_value = parseFloat((value / 1000).toFixed(3)); // Percent to ratio
+              if (value > 300) {                                // Fix mV reported
+                new_value = parseFloat((value / 1000).toFixed(3));
+              }
+              units = 'V'
             }
             if (key == 'battery') {
-              new_value = parseFloat((value / 100).toFixed(2)); // Percent to ratio
+              new_value = parseFloat((value / 100).toFixed(2));
+              units = 'ratio'
             }
-            deltas.push({path: path + key, value: new_value});
+            if (units == "") {
+              deltas.push({path: path + key, value: new_value});
+            } else {
+              deltas.push({path: path + key, value: new_value});
+              metas.push({path: path + key, value: {units: units}});
+            }
           }
         }
+      }
+      if (metas.length == metas_prev.length) {  // Good enough comparison to check if new metas need to be sent
+        metas = []
       }
       const delta = {
         context: context,
         updates: [
           {
             $source: 'mqtt',
+            meta: metas,
             values: deltas
           },
         ],
       };
+      metas_prev = metas.slice()
       return delta
     }
 
