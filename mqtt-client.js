@@ -48,7 +48,7 @@ module.exports = function (app) {
           var new_value = value;
           var units = '';
           var description = '';
-          //app.debug('key: ' + key + ' value: ' + value + ' ttl: ' + valueTTL);
+          app.debug('key: ' + key + ' value: ' + value + ' ttl: ' + valueTTL);
           if (valueTTL > epoch) {
             if (key == 'temperature') {
               new_value = parseFloat((value + 273.15).toFixed(2)); // Celcius to Kelvin
@@ -137,7 +137,9 @@ module.exports = function (app) {
     client.on('message',function(topic, message, packet) {
     	app.debug("Topic is " + topic);
       app.debug("Message is " + message);
-      if (!topic.match('/bridge/')) {
+      if (topic.match('/bridge/')) {
+        app.debug('Skipping topic %s', topic)
+      } else {
         topic = topic.replace(/^[a-zA-Z0-9]+\//,'');
         var values = JSON.parse(message);
         addValues(topic, values);
