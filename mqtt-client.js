@@ -1,4 +1,5 @@
 var mqtt = require('mqtt')
+var putMap = require('./lib/put-map')
 const id = 'signalk-mqtt-client'
 var count = 0
 var client
@@ -17,11 +18,11 @@ module.exports = function (app) {
 
   plugin.id = 'signalk-mqtt-client'
   plugin.name = 'Simple MQTT client'
-  plugin.description = 'Simple MQTT client to get updates from MQTT broker'
+  plugin.description = 'Simple MQTT client to get updates from MQTT broker; PUT on electrical.switches.*.state'
 
   plugin.start = function (options, restartPlugin) {
     app.debug('Options: ' + JSON.stringify(options))
-    for (const [key, value] of Object.entries(options.paths)) {
+    for (const [key, value] of Object.entries(options.paths || {})) {
       paths[value['topic']] = value['path']
     }
     app.debug('paths: ' + JSON.stringify(paths))
@@ -172,6 +173,46 @@ module.exports = function (app) {
         app.debug('publish: %s %s', topic, message)
         client.publish(topic, message, options)
       }
+    }
+
+    function rememberPutState (skPath, topic, skValue) {
+      if (!states[skPath]) {
+        states[skPath] = { state: skValue, stateChange: Date.now(), topic: topic }
+      } else {
+        states[skPath].state = skValue
+        states[skPath].stateChange = Date.now()
+      }
+    }
+
+    function publishSwitchPut (topic, skPath, raw, cb) {
+      var state = putMap.toZigbeeState(raw)
+      var skValue = putMap.toSkState(state)
+      var mqttTopic = putMap.commandTopic('zigbee2mqtt', topic)
+      var payload = JSON.stringify({ state: state })
+      app.debug('PUT %s -> %s %s', skPath, mqttTopic, payload)
+      addValues(topic, { state: state })
+      rememberPutState(skPath, topic, skValue)
+      publish(mqttTopic, payload)
+      app.handleMessage(id, {
+        updates: [{
+          $source: 'mqtt',
+          values: [{ path: skPath, value: skValue }]
+        }]
+      })
+      var result = { state: 'COMPLETED', statusCode: 200 }
+      if (cb) cb(result)
+      return result
+    }
+
+    if (typeof app.registerPutHandler === 'function') {
+      Object.keys(paths).forEach(function (topic) {
+        var base = paths[topic]
+        if (!putMap.shouldHandlePut(base)) return
+        var skPath = putMap.skStatePath(base, topic)
+        app.registerPutHandler('vessels.self', skPath, function (context, p, v, cb) {
+          return publishSwitchPut(topic, p, v, cb)
+        }, 'mqtt')
+      })
     }
 
     function sendUpdates () {
