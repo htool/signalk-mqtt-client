@@ -3,6 +3,7 @@ var putMap = require('./lib/put-map')
 const id = 'signalk-mqtt-client'
 var count = 0
 var client
+var getStateTimer
 var intervalTime = 10; // seconds between updates
 var TTL = 3600; // default TTL in seconds
 
@@ -268,8 +269,19 @@ module.exports = function (app) {
       }
     })
 
+    // Ask zigbee2mqtt for the current state of switch devices, so their
+    // state is known in Signal K after a restart (messages are not retained).
+    function requestSwitchStates () {
+      Object.keys(paths).forEach(function (topic) {
+        if (!putMap.shouldHandlePut(paths[topic])) return
+        publish('zigbee2mqtt/' + topic + '/get', '{"state": ""}')
+      })
+    }
+
     client.on("connect",function() {
       app.debug("Connected " + client.connected)
+      clearTimeout(getStateTimer)
+      getStateTimer = setTimeout(requestSwitchStates, 2000)
     })
 
     client.on("end",function() {
@@ -293,6 +305,7 @@ module.exports = function (app) {
 
   plugin.stop = function () {
     // Here we put logic we need when the plugin stops
+    clearTimeout(getStateTimer)
     client.end()
     app.debug('Plugin stopped')
   }
