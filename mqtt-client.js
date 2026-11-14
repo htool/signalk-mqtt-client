@@ -168,7 +168,7 @@ module.exports = function (app) {
     }
 
     function publish (topic, message) {
-      let options = {retain:true, qos:1}
+      let options = {retain:false, qos:1}
       if (client.connected == true){
         app.debug('publish: %s %s', topic, message)
         client.publish(topic, message, options)

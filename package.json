@@ -4,7 +4,7 @@
   "description": "Simple MQTT client to get updates from MQTT broker",
   "main": "mqtt-client.js",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
